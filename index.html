@@ -1,0 +1,163 @@
+
+<DOCTYPE html>
+<html>
+	<head>
+		<title>Simple midi keyboard</title>
+	</head>
+	<body>
+		
+		<div id="keyboard-place">
+			<div id="keyboard"></div>
+		</div>
+		
+		<style>
+			
+			* {
+				box-sizing: border-box;
+			}
+			
+			html {
+				background-color: #eee;
+			}
+			
+			#keyboard-place {
+				text-align: center;
+			}
+			
+			#keyboard {
+				display: inline-block;
+				padding-left: 40px;
+				padding-right: 30px;
+				padding-top: 20px;
+				padding-bottom: 10px;
+				background-color: #333;
+				border-radius: 7px;
+			}
+			
+			#keyboard::after {
+				display: table;
+				content: '';
+				clear: both;
+			}
+			
+			.key {
+				float: left;
+				width: 20px;
+				height: 100px;
+				border: 1px solid #eee;
+				border-radius: 2px;
+				background-color: #fff;
+				margin: auto 1px;
+			}
+			
+			.key:nth-child(12n+2),
+			.key:nth-child(12n+4),
+			.key:nth-child(12n+7),
+			.key:nth-child(12n+9),
+			.key:nth-child(12n+11) {
+				width: 13px;
+				height: 70px;
+				border: 1px solid #333;
+				background-color: #111;
+				position: relative;
+				margin-left: -14px;
+				left: 6px;
+			}
+			
+			.key.active {
+				background-color: #6a6;
+			}
+			
+		</style>
+		
+		<script>
+			
+			if (navigator.requestMIDIAccess) {
+				navigator.requestMIDIAccess().then(midiOnSuccess,midiOnFailure);
+			}
+			
+			function midiOnSuccess(midi) {
+				
+				var inputs = midi.inputs.values();
+				
+				for (var input = inputs.next(); input && !input.done; input = inputs.next()) {
+					input.value.onmidimessage = onMIDIMessage;
+				}
+			}
+			
+			function midiOnFailure() {
+				alert('Please plug in your MIDI keyboard and restart the page');
+			}
+			
+			function onMIDIMessage(message) {
+				
+				/*
+				
+				Midi message structure:
+				[message_id, note_number, velocity]
+				
+				message_id
+				144 noteOn
+				128 noteOff
+				
+				*/
+				
+				var noteNumber = message.data[1];
+				
+				if (message.data[0] === 144 && message.data[2] > 0) {
+					startSoundNote(noteNumber);
+				}
+				
+				if (message.data[0] === 128 || message.data[2] === 0) {
+					stopSoundNote(noteNumber);
+				}
+				
+			}
+			
+			
+			var context = new AudioContext();
+			var oscillators = {};
+			
+			for (var i = 0; i <= 120; i++) {
+				var oscillator = context.createOscillator();
+				oscillator.frequency.value = Math.pow(2, ((i - 69) / 12)) * 440;
+				
+				oscillator.gain = context.createGain();
+				oscillator.gain.connect(context.destination);
+				oscillator.gain.gain.setValueAtTime(0, context.currentTime)
+				oscillator.connect(oscillator.gain);
+				
+				oscillator.start();
+				oscillators[i] = oscillator;
+			}
+			
+			function startSoundNote(noteNumber) {
+				oscillators[noteNumber].gain.gain.setValueAtTime(0.5, context.currentTime);
+				activeKey(noteNumber);
+			}
+			
+			function stopSoundNote(noteNumber) {
+				oscillators[noteNumber].gain.gain.setValueAtTime(0, context.currentTime);
+				deactiveKey(noteNumber);
+			}
+			
+			var keys = [];
+			
+			for (var i = 0; i < 24; i++) {
+				var keyNode = document.createElement('div');
+				keyNode.classList.add('key');
+				document.getElementById('keyboard').appendChild(keyNode);
+				keys[i] = keyNode;
+			}
+			
+			function activeKey(noteNumber) {
+				keys[noteNumber % 24].classList.add('active');
+			}
+			
+			function deactiveKey(noteNumber) {
+				keys[noteNumber % 24].classList.remove('active');
+			}
+		</script>
+		
+	</body>
+</html>
